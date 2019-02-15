@@ -1,13 +1,16 @@
 from datetime import datetime
 from hashlib import md5
+from time import time
+import jwt
 
 from flask_login import UserMixin
+from flask import current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from app import db, login_manager
+from app import db, login
 
 
-@login_manager.user_loader
+@login.user_loader
 def load_user(user_id):
     return User.query.get(user_id)
 
@@ -54,7 +57,9 @@ class User(UserMixin, db.Model):
             self.followed.remove(user)
 
     def is_following(self, user):
-        return db.session.query(self.followed.filter(followers.c.followed_id == user.id).exists())
+        return db.session.query(
+            self.followed.filter(followers.c.followed_id == user.id).exists()
+        ).scalar()
 
     def followed_posts(self):
         own_posts = Post.query.filter_by(user_id=self.id)
@@ -63,6 +68,19 @@ class User(UserMixin, db.Model):
             .filter(followers.c.follower_id == 1) \
             .union(own_posts) \
             .order_by(Post.id.desc())
+
+    def get_reset_password_token(self, expires_in=600):
+        return jwt.encode({'reset_password': self.id, 'exp': time() + expires_in},
+                          current_app.config['SECRET_KEY'], algorithm='HS256').decode('utf-8')
+
+    @staticmethod
+    def verify_reset_password_token(token):
+        secret = current_app.config['SECRET_KEY']
+        try:
+            user_id = jwt.decode(token, secret, algorithms=['HS256'])['reset_password']
+        except:
+            return
+        return User.query.get(user_id)
 
     def __repr__(self):
         return '<User {}>'.format(self.username)
@@ -73,6 +91,7 @@ class Post(db.Model):
     body = db.Column(db.String(140))
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    language = db.Column(db.String(5))
 
     def __repr__(self):
         return '<Post {}>'.format(self.body)
