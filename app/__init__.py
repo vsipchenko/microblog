@@ -2,7 +2,8 @@ import logging
 import os
 from logging.handlers import SMTPHandler, RotatingFileHandler
 
-from flask import Flask, request
+from elasticsearch import Elasticsearch
+from flask import Flask, request, current_app
 from flask_babel import Babel
 from flask_bootstrap import Bootstrap
 from flask_mail import Mail
@@ -34,6 +35,8 @@ def create_app(config_class=Config):
     bootstrap.init_app(app)
     moment.init_app(app)
     babel.init_app(app)
+    elasticsearch_url = app.config.get('ELASTICSEARCH_URL')
+    app.elasticsearch = Elasticsearch([elasticsearch_url]) if elasticsearch_url else None
 
     from app.errors import bp as errors_bp
     app.register_blueprint(errors_bp)
@@ -74,6 +77,7 @@ def create_app(config_class=Config):
 
 @babel.localeselector
 def get_locale():
-    return request.accept_languages.best_match(app.config['LANGUAGES'])
+    return request.accept_languages.best_match(current_app.config['LANGUAGES'])
+
 
 from app import models

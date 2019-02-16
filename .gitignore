@@ -1,4 +1,5 @@
 app.db
 .idea/
 .env
+logs/
 __pycache__/
